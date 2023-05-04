@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
+import 'package:galleryimage/galleryimage.dart';
 
 class PoiElement {
   String type;
@@ -63,15 +64,17 @@ class PoiManager {
     http.Response response = await http.post(Uri.parse(overpassUrl),
         headers: {"charset": "utf-8"}, body: body);
     if (response.statusCode == 200) {
-      return OverpassResponse.fromJson(jsonDecode(utf8.decode(response.bodyBytes)));
+      return OverpassResponse.fromJson(
+          jsonDecode(utf8.decode(response.bodyBytes)));
     } else {
       return null;
     }
   }
 
-  showPoiDetails(PoiElement poiElement, BuildContext context) {
+  showPoiDetails(PoiElement poiElement, BuildContext context) async {
     if (poiElement.tags == null) return;
     Map<String, dynamic> tags = poiElement.tags!;
+    List<String> images = await getImages(tags);
     showBottomSheet(
       context: context,
       builder: (context) {
@@ -124,11 +127,16 @@ class PoiManager {
                               fontWeight: FontWeight.bold, fontSize: 20),
                         ),
                       ),
-                      Text(
-                        (tags["source"] ?? "").toString().replaceAll("_", ""),
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 20),
-                      ),
+                      // Text(
+                      //   (tags["source"] ?? "").toString().replaceAll("_", ""),
+                      //   style: TextStyle(
+                      //       fontWeight: FontWeight.bold, fontSize: 20),
+                      // ),
+                      GalleryImage(
+                        imageUrls: images,
+                        numOfShowImages: images.length < 4 ? images.length : 4,
+                        titleGallery: "",
+                      )
                     ]))
                   ]);
             });
@@ -160,5 +168,29 @@ class PoiManager {
       countryString += ", $country";
     }
     return streetString + postCodeString + countryString;
+  }
+
+  Future<List<String>> getImages(Map<String, dynamic> tags) async {
+    List<String> urls = [];
+    for (String key in tags.keys) {
+      // img|image:access_sign|image
+      if (RegExp(r'(image)').hasMatch(key) &&
+          RegExp(r'(https:\/\/.*\.jpg|https:\/\/.*\.png|https:\/\/.*\.JPG|https:\/\/.*\.jpeg|https:\/\/.*\.PNG|https:\/\/.*\.JPEG)').hasMatch(tags[key])) {
+        urls.add(tags[key]);
+      }
+      if (key == "wikimedia_commons") {
+        http.Response response = await http.get(Uri.parse(
+            "https://api.wikimedia.org/core/v1/commons/file/" + tags[key]));
+        if (response.statusCode == 200) {
+          Map<String, dynamic> jsonBody =
+              jsonDecode(utf8.decode(response.bodyBytes));
+          if (jsonBody.containsKey("preferred") &&
+              jsonBody["preferred"].containsKey("url")) {
+            urls.add(jsonBody["preferred"]["url"]);
+          }
+        }
+      }
+    }
+    return urls;
   }
 }

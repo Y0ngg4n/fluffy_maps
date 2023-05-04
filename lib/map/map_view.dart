@@ -34,7 +34,8 @@ class _MapViewState extends State<MapView> {
 
   void getPois() async {
     var position = await LocationManager().determinePosition();
-    OverpassResponse? overpassResponse = await poiManager.getAllPoiInRadius(100, LatLng(position.latitude, position.longitude));
+    OverpassResponse? overpassResponse = await poiManager.getAllPoiInRadius(
+        100, LatLng(position.latitude, position.longitude));
     if (overpassResponse != null) {
       setState(() {
         poiElements = overpassResponse.elements
@@ -42,6 +43,9 @@ class _MapViewState extends State<MapView> {
                 element.tags != null && element.tags!.containsKey("name"))
             .toList();
       });
+    }
+    for (var i in poiElements) {
+      if (i.tags != null) List<String> images = await poiManager.getImages(i.tags!);
     }
   }
 
