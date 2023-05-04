@@ -1,4 +1,5 @@
 import 'package:fluffy_maps/map/map_view.dart';
+import 'package:fluffy_maps/menu.dart';
 import 'package:flutter/material.dart';
 
 void main() {
@@ -15,9 +16,7 @@ class FluffyMaps extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home: Scaffold(
-        body: MapView(),
-      ),
+      home: MainMenu(),
     );
   }
 }
