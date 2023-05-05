@@ -35,7 +35,7 @@ class _MapViewState extends State<MapView> {
   void getPois() async {
     var position = await LocationManager().determinePosition();
     OverpassResponse? overpassResponse = await poiManager.getAllPoiInRadius(
-        100, LatLng(position.latitude, position.longitude));
+        500, LatLng(position.latitude, position.longitude));
     if (overpassResponse != null) {
       setState(() {
         poiElements = overpassResponse.elements

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:galleryimage/galleryimage.dart';
 
 class PoiElement {
@@ -157,7 +158,11 @@ class PoiManager {
       streetString = "$street $housenumber";
     }
     if (postcode != null) {
-      postCodeString += ", $postcode";
+      if (streetString.isEmpty) {
+        postCodeString += postcode;
+      } else {
+        postCodeString += ", $postcode";
+      }
       if (city != null) {
         postCodeString += " $city";
       }
@@ -175,21 +180,55 @@ class PoiManager {
     for (String key in tags.keys) {
       // img|image:access_sign|image
       if (key == "image") {
-        urls.add(tags[key]);
+        String url = tags[key];
+        RegExp wikimedia =
+            RegExp(r"https:\/\/commons\.wikimedia\.org\/wiki\/(.*)");
+        RegExpMatch? wikimediaFile = wikimedia.firstMatch(url);
+        if (wikimediaFile != null &&
+            wikimediaFile.groupCount > 0 &&
+            wikimediaFile.group(1) != null) {
+          String? wikimediaUrl =
+              await extractWikimediaUrl(wikimediaFile.group(1)!);
+          if (wikimediaUrl != null) {
+            urls.add(wikimediaUrl);
+          }
+        }
       }
-      else if (key == "wikimedia_commons") {
-        http.Response response = await http.get(Uri.parse(
-            "https://api.wikimedia.org/core/v1/commons/file/" + tags[key]));
-        if (response.statusCode == 200) {
-          Map<String, dynamic> jsonBody =
-              jsonDecode(utf8.decode(response.bodyBytes));
-          if (jsonBody.containsKey("preferred") &&
-              jsonBody["preferred"].containsKey("url")) {
-            urls.add(jsonBody["preferred"]["url"]);
+      if (key == "wikimedia_commons") {
+        String? url = await extractWikimediaUrl(tags[key]);
+        if (url != null) {
+          urls.add(url);
+        }
+      }
+      if (key == "mapillary") {
+        String? accessToken = dotenv.env['MAPILLARY_ACCESS_TOKEN'];
+        if (accessToken != null) {
+          http.Response response = await http.get(Uri.parse(
+              "https://graph.mapillary.com/${tags[key]}?access_token=${accessToken}&fields=id,captured_at,compass_angle,sequence,geometry,thumb_1024_url"));
+          if (response.statusCode == 200) {
+            Map<String, dynamic> jsonBody =
+                jsonDecode(utf8.decode(response.bodyBytes));
+            if (jsonBody.containsKey("thumb_1024_url")) {
+              urls.add(jsonBody["thumb_1024_url"]);
+            }
           }
         }
       }
     }
     return urls;
+  }
+
+  Future<String?> extractWikimediaUrl(String file) async {
+    http.Response response = await http
+        .get(Uri.parse("https://api.wikimedia.org/core/v1/commons/file/$file"));
+    if (response.statusCode == 200) {
+      Map<String, dynamic> jsonBody =
+          jsonDecode(utf8.decode(response.bodyBytes));
+      if (jsonBody.containsKey("preferred") &&
+          jsonBody["preferred"].containsKey("url")) {
+        return jsonBody["preferred"]["url"];
+      }
+    }
+    return null;
   }
 }
