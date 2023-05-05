@@ -174,11 +174,10 @@ class PoiManager {
     List<String> urls = [];
     for (String key in tags.keys) {
       // img|image:access_sign|image
-      if (RegExp(r'(image)').hasMatch(key) &&
-          RegExp(r'(https:\/\/.*\.jpg|https:\/\/.*\.png|https:\/\/.*\.JPG|https:\/\/.*\.jpeg|https:\/\/.*\.PNG|https:\/\/.*\.JPEG)').hasMatch(tags[key])) {
+      if (key == "image") {
         urls.add(tags[key]);
       }
-      if (key == "wikimedia_commons") {
+      else if (key == "wikimedia_commons") {
         http.Response response = await http.get(Uri.parse(
             "https://api.wikimedia.org/core/v1/commons/file/" + tags[key]));
         if (response.statusCode == 200) {
