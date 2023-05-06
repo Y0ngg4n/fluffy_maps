@@ -1,6 +1,8 @@
 import 'dart:convert';
 
+import 'package:fluffy_maps/map/map_settings.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -72,11 +74,27 @@ class PoiManager {
     }
   }
 
+   Future<OverpassResponse?> getAllPoiInBounds(
+      LatLngBounds? latLngBounds , LatLng position) async {
+    if(latLngBounds == null) return null;
+    String body = "[out:json][timeout:20][maxsize:536870912];";
+    body += "node(${latLngBounds.south}, ${latLngBounds.west},${latLngBounds.north}, ${latLngBounds.east});";
+    body += "out;";
+    http.Response response = await http.post(Uri.parse(overpassUrl),
+        headers: {"charset": "utf-8"}, body: body);
+    if (response.statusCode == 200) {
+      return OverpassResponse.fromJson(
+          jsonDecode(utf8.decode(response.bodyBytes)));
+    } else {
+      return null;
+    }
+  }
+
   showPoiDetails(PoiElement poiElement, BuildContext context) async {
     if (poiElement.tags == null) return;
     Map<String, dynamic> tags = poiElement.tags!;
     List<String> images = await getImages(tags);
-    showBottomSheet(
+    showModalBottomSheet(
       context: context,
       builder: (context) {
         return DraggableScrollableSheet(
@@ -147,15 +165,23 @@ class PoiManager {
 
   String getAdress(Map<String, dynamic> tags) {
     String? street = tags["addr:street"];
+    String? contactStreet = tags["contact:street"];
     String? housenumber = tags["addr:housenumber"];
+    String? contactHousenumber = tags["contact:housenumber"];
     String? postcode = tags["addr:postcode"];
     String? city = tags["addr:city"];
+    String? contactAdress = tags["contact:address"];
+    String? contactAdressFull = tags["contact:address:full"];
     String? country = tags["addr:country"];
     String streetString = "";
     String postCodeString = "";
     String countryString = "";
     if (street != null && housenumber != null) {
       streetString = "$street $housenumber";
+    } else {
+      if (contactStreet != null && contactHousenumber != null) {
+        streetString = "$contactStreet $contactHousenumber";
+      }
     }
     if (postcode != null) {
       if (streetString.isEmpty) {
@@ -172,7 +198,15 @@ class PoiManager {
     if (country != null) {
       countryString += ", $country";
     }
-    return streetString + postCodeString + countryString;
+    String fullAddress = streetString + postCodeString + countryString;
+    if (fullAddress.isEmpty) {
+      if (contactAdress != null && contactAdress.isNotEmpty) {
+        return contactAdress;
+      } else if (contactAdressFull != null && contactAdressFull.isNotEmpty) {
+        return contactAdressFull;
+      }
+    }
+    return fullAddress;
   }
 
   Future<List<String>> getImages(Map<String, dynamic> tags) async {

@@ -1,5 +1,6 @@
 import 'package:fluffy_maps/map/map_settings.dart';
 import 'package:fluffy_maps/map/poi_manager.dart';
+import 'package:fluffy_maps/map/search.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_location_marker/flutter_map_location_marker.dart';
@@ -8,79 +9,70 @@ import 'package:flutter_map_floating_marker_titles/flutter_map_floating_marker_t
 import 'package:flutter_floating_map_marker_titles_core/controller/fmto_controller.dart';
 import 'package:flutter_floating_map_marker_titles_core/model/floating_marker_title_info.dart';
 import 'location_manager.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class MapView extends StatefulWidget {
-  const MapView({Key? key}) : super(key: key);
+class MapView extends ConsumerStatefulWidget {
+  MapView({Key? key}) : super(key: key);
 
   @override
-  State<MapView> createState() => _MapViewState();
+  ConsumerState<MapView> createState() => _MapViewState();
 }
 
-class _MapViewState extends State<MapView> {
-  FMTOMapController mapController = FMTOMapController();
+class _MapViewState extends ConsumerState<MapView> {
   FollowOnLocationUpdate followOnLocationUpdate = FollowOnLocationUpdate.once;
-  TurnOnHeadingUpdate turnOnHeadingUpdate = TurnOnHeadingUpdate.once;
+  TurnOnHeadingUpdate turnOnHeadingUpdate = TurnOnHeadingUpdate.never;
   LocationManager locationManager = LocationManager();
   PoiManager poiManager = PoiManager();
-  List<PoiElement> poiElements = [];
-  final List<FloatingMarkerTitleInfo> floatingTitles = [];
 
   @override
   void initState() {
     super.initState();
     LocationManager().determinePosition();
-    getPois();
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => ref.read(poiProvider.notifier).getPois());
   }
 
-  void getPois() async {
-    var position = await LocationManager().determinePosition();
-    OverpassResponse? overpassResponse = await poiManager.getAllPoiInRadius(
-        500, LatLng(position.latitude, position.longitude));
-    if (overpassResponse != null) {
-      setState(() {
-        poiElements = overpassResponse.elements
-            .where((element) =>
-                element.tags != null && element.tags!.containsKey("name"))
-            .toList();
-      });
-    }
-    for (var i in poiElements) {
-      if (i.tags != null) List<String> images = await poiManager.getImages(i.tags!);
-    }
-  }
-
-  List<Marker> getPoiMarker() {
-    return poiElements
+  List<Marker> getPoiMarker(List<Poi> elements) {
+    Poi? selectedPoi = ref.read(selectedPoiProvider.notifier).state;
+    print(selectedPoi);
+    return elements
         .map((e) => Marker(
               // Experimentation
               anchorPos: AnchorPos.exactly(Anchor(40, 30)),
-              point: LatLng(e.lat, e.lon),
+              point: LatLng(e.poiElement.lat, e.poiElement.lon),
               width: 80,
               height: 80,
               builder: (ctx) => GestureDetector(
                 onTap: () {
-                  poiManager.showPoiDetails(e, context);
+                  poiManager.showPoiDetails(e.poiElement, context);
                 },
                 child: Icon(
                   Icons.location_pin,
-                  size: 25,
+                  size: selectedPoi != null &&
+                          e.poiElement.id == selectedPoi.poiElement.id
+                      ? 40
+                      : 25,
+                  color: selectedPoi != null && e.poiElement.id == selectedPoi.poiElement.id
+                      ? Colors.red
+                      : Colors.black,
                 ),
               ),
             ))
         .toList();
   }
 
-  List<FloatingMarkerTitleInfo> getTitles() {
+  List<FloatingMarkerTitleInfo> getTitles(List<Poi> elements) {
     List<FloatingMarkerTitleInfo> titles = [];
-    for (int i = 0; i < poiElements.length; i++) {
-      var currentElement = poiElements[i];
-      if (currentElement.tags != null &&
-          currentElement.tags!.containsKey("name") &&
-          currentElement.tags!["name"] != null) {
+    for (int i = 0; i < elements.length; i++) {
+      var currentElement = elements[i];
+      if (currentElement.poiElement.tags != null &&
+          currentElement.poiElement.tags!.containsKey("name") &&
+          currentElement.poiElement.tags!["name"] != null) {
         titles.add(FloatingMarkerTitleInfo(
             id: i,
-            latLng: LatLng(currentElement.lat, currentElement.lon),
-            title: currentElement.tags!["name"],
+            latLng: LatLng(
+                currentElement.poiElement.lat, currentElement.poiElement.lon),
+            title: currentElement.poiElement.tags!["name"],
             color: Colors.black));
       }
     }
@@ -89,12 +81,13 @@ class _MapViewState extends State<MapView> {
 
   @override
   Widget build(BuildContext context) {
+    List<Poi> pois = ref.watch(poiProvider);
     return Stack(
       children: [
         FlutterMapWithFMTO(
-          floatingTitles: getTitles(),
-          options: MapSettings.getMapOptions(),
-          mapController: mapController,
+          floatingTitles: getTitles(pois),
+          options: MapSettings.getMapOptions(ref),
+          mapController: MapSettings.mapController,
           fmtoOptions: FMTOOptions(),
           children: [
             MapSettings.getTileLayerWidget(),
@@ -103,7 +96,7 @@ class _MapViewState extends State<MapView> {
               turnOnHeadingUpdate: turnOnHeadingUpdate,
             ),
             MarkerLayer(
-              markers: getPoiMarker(),
+              markers: getPoiMarker(pois),
             )
           ],
         ),
@@ -111,12 +104,25 @@ class _MapViewState extends State<MapView> {
             bottom: 10,
             right: 10,
             child: FloatingActionButton(
+              heroTag: "myLocation",
               child: const Icon(Icons.my_location),
               onPressed: () async {
                 var position = await locationManager.determinePosition();
-                mapController.move(
+                MapSettings.mapController.move(
                     LatLng(position.latitude, position.longitude),
-                    mapController.zoom);
+                    MapSettings.mapController.zoom);
+              },
+            )),
+        Positioned(
+            top: 10,
+            left: 10,
+            child: FloatingActionButton(
+              heroTag: "Search",
+              child: const Icon(Icons.search),
+              onPressed: () {
+                Navigator.of(context).push(MaterialPageRoute(
+                  builder: (context) => const SearchView(),
+                ));
               },
             ))
       ],
