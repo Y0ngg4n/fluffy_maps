@@ -151,7 +151,9 @@ class _SearchViewState extends ConsumerState<SearchView> {
                                           double.parse(element.lon)),
                                       19,
                                       0);
-                                  await ref.read(poiProvider.notifier).getPois();
+                                  await ref
+                                      .read(poiProvider.notifier)
+                                      .getPois();
                                   Poi matchedPoi = ref
                                       .read(poiProvider.notifier)
                                       .state
@@ -162,6 +164,8 @@ class _SearchViewState extends ConsumerState<SearchView> {
                                       .read(selectedPoiProvider.notifier)
                                       .set(matchedPoi);
                                   Navigator.pop(context);
+                                  PoiManager().showPoiDetails(
+                                      matchedPoi.poiElement, context);
                                 },
                               )
                           ],
