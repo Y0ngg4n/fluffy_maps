@@ -84,7 +84,7 @@ class SearchView extends ConsumerStatefulWidget {
 
 class _SearchViewState extends ConsumerState<SearchView> {
   TextEditingController textEditingController = TextEditingController();
-  NomatimResponse? searchList;
+  NomatimResponse? nomatimSearch;
 
   @override
   Widget build(BuildContext context) {
@@ -111,12 +111,12 @@ class _SearchViewState extends ConsumerState<SearchView> {
                       Future.delayed(
                         const Duration(seconds: 1),
                         () async {
-                          Position position =
+                          Position? position =
                               await LocationManager().determinePosition();
                           NomatimResponse? response = await searchNomatim(
                               position, textEditingController.text);
                           setState(() {
-                            searchList = response;
+                            nomatimSearch = response;
                           });
                         },
                       );
@@ -125,15 +125,15 @@ class _SearchViewState extends ConsumerState<SearchView> {
                 },
               ),
             ),
-            searchList == null && textEditingController.text.isNotEmpty
+            nomatimSearch == null && textEditingController.text.isNotEmpty
                 ? CircularProgressIndicator()
-                : (searchList == null || textEditingController.text.isEmpty
+                : (nomatimSearch == null || textEditingController.text.isEmpty
                     ? Container()
                     : Expanded(
                         child: ListView(
                           shrinkWrap: true,
                           children: [
-                            for (SearchElement element in searchList!.elements)
+                            for (SearchElement element in nomatimSearch!.elements)
                               ListTile(
                                 leading: element.icon != null
                                     ? Image.network(element.icon!)
@@ -165,7 +165,7 @@ class _SearchViewState extends ConsumerState<SearchView> {
                                       .set(matchedPoi);
                                   Navigator.pop(context);
                                   PoiManager().showPoiDetails(
-                                      matchedPoi.poiElement, context);
+                                      matchedPoi, context);
                                 },
                               )
                           ],
@@ -177,7 +177,7 @@ class _SearchViewState extends ConsumerState<SearchView> {
     );
   }
 
-  Future<NomatimResponse?> searchNomatim(Position position, searchText) async {
+  Future<NomatimResponse?> searchNomatim(Position? position, searchText) async {
     print("Search");
     http.Response response = await http.get(
         Uri.parse(
@@ -187,6 +187,7 @@ class _SearchViewState extends ConsumerState<SearchView> {
     if (response.statusCode == 200) {
       NomatimResponse nomatimResponse =
           NomatimResponse.fromJson(jsonDecode(utf8.decode(response.bodyBytes)));
+      if(position == null) return nomatimResponse;
       if (nomatimResponse.elements.length > 1) {
         nomatimResponse.elements.sort(
           (a, b) {

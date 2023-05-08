@@ -4,6 +4,7 @@ import 'package:fluffy_maps/map/search.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_location_marker/flutter_map_location_marker.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:flutter_map_floating_marker_titles/flutter_map_floating_marker_titles.dart';
 import 'package:flutter_floating_map_marker_titles_core/controller/fmto_controller.dart';
@@ -28,23 +29,25 @@ class _MapViewState extends ConsumerState<MapView> {
   void initState() {
     super.initState();
     LocationManager().determinePosition();
-    WidgetsBinding.instance
-        .addPostFrameCallback((_) => ref.read(poiProvider.notifier).getPois());
+    WidgetsBinding.instance.addPostFrameCallback(
+        (_) {
+          ref.read(poiProvider.notifier).getPois();
+          ref.read(buildingProvider.notifier).getBuildingBoundaries();
+        });
   }
 
   List<Marker> getPoiMarker(List<Poi> elements) {
     Poi? selectedPoi = ref.read(selectedPoiProvider.notifier).state;
-    print(selectedPoi);
     return elements
         .map((e) => Marker(
               // Experimentation
               anchorPos: AnchorPos.exactly(Anchor(40, 30)),
-              point: LatLng(e.poiElement.lat, e.poiElement.lon),
+              point: LatLng(e.poiElement.lat!, e.poiElement.lon!),
               width: 80,
               height: 80,
               builder: (ctx) => GestureDetector(
                 onTap: () {
-                  poiManager.showPoiDetails(e.poiElement, context);
+                  poiManager.showPoiDetails(e, context);
                 },
                 child: Icon(
                   Icons.location_pin,
@@ -52,13 +55,28 @@ class _MapViewState extends ConsumerState<MapView> {
                           e.poiElement.id == selectedPoi.poiElement.id
                       ? 40
                       : 25,
-                  color: selectedPoi != null && e.poiElement.id == selectedPoi.poiElement.id
+                  color: selectedPoi != null &&
+                          e.poiElement.id == selectedPoi.poiElement.id
                       ? Colors.red
                       : Colors.black,
                 ),
               ),
             ))
         .toList();
+  }
+
+  List<Polyline> getPolylines() {
+    List<Polyline> polylines = [];
+    return polylines;
+  }
+
+  List<Polygon> getPolygons() {
+    List<Polygon> polygons = [];
+    List<Building> buildings = ref.read(buildingProvider.notifier).state;
+    for(Building building in buildings){
+      polygons.add(Polygon(points: building.boundaries));
+    }
+    return polygons;
   }
 
   List<FloatingMarkerTitleInfo> getTitles(List<Poi> elements) {
@@ -71,8 +89,8 @@ class _MapViewState extends ConsumerState<MapView> {
         titles.add(FloatingMarkerTitleInfo(
             id: i,
             latLng: LatLng(
-                currentElement.poiElement.lat, currentElement.poiElement.lon),
-            title: currentElement.poiElement.tags!["name"],
+                currentElement.poiElement.lat!, currentElement.poiElement.lon!),
+            title: currentElement.poiElement.tags!["name"]!,
             color: Colors.black));
       }
     }
@@ -97,6 +115,14 @@ class _MapViewState extends ConsumerState<MapView> {
             ),
             MarkerLayer(
               markers: getPoiMarker(pois),
+            ),
+            PolygonLayer(
+              polygons: getPolygons(),
+              polygonCulling: true,
+            ),
+            PolylineLayer(
+              polylines: getPolylines(),
+              polylineCulling: true,
             )
           ],
         ),
@@ -107,7 +133,8 @@ class _MapViewState extends ConsumerState<MapView> {
               heroTag: "myLocation",
               child: const Icon(Icons.my_location),
               onPressed: () async {
-                var position = await locationManager.determinePosition();
+                Position? position = await locationManager.determinePosition();
+                if (position == null) return;
                 MapSettings.mapController.move(
                     LatLng(position.latitude, position.longitude),
                     MapSettings.mapController.zoom);
@@ -139,7 +166,7 @@ class PoiSliverAppBar extends SliverPersistentHeaderDelegate {
     return Container(
       color: Colors.red,
       child: Column(
-        children: [Text(poiElement.tags!["name"])],
+        children: [Text(poiElement.tags!["name"]!)],
       ),
     );
   }

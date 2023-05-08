@@ -11,16 +11,18 @@ import 'package:galleryimage/galleryimage.dart';
 class PoiElement {
   String type;
   int id;
-  double lat;
-  double lon;
-  Map<String, dynamic>? tags;
+  double? lat;
+  double? lon;
+  Map<String, String>? tags;
+  List<int>? nodes;
 
   PoiElement(
       {required this.type,
       required this.id,
       required this.lat,
       required this.lon,
-      required this.tags});
+      required this.tags,
+      this.nodes});
 
   factory PoiElement.fromJson(Map<String, dynamic> json) {
     return PoiElement(
@@ -28,7 +30,10 @@ class PoiElement {
         id: json['id'],
         lat: json['lat'],
         lon: json['lon'],
-        tags: json['tags']);
+        tags: json['tags'] != null
+            ? Map<String, String>.from(json['tags'])
+            : null,
+        nodes: json['nodes'] != null ? List<int>.from(json['nodes']) : null);
   }
 }
 
@@ -74,11 +79,12 @@ class PoiManager {
     }
   }
 
-   Future<OverpassResponse?> getAllPoiInBounds(
-      LatLngBounds? latLngBounds , LatLng position) async {
-    if(latLngBounds == null) return null;
+  Future<OverpassResponse?> getAllPoiInBounds(
+      LatLngBounds? latLngBounds, LatLng position) async {
+    if (latLngBounds == null) return null;
     String body = "[out:json][timeout:20][maxsize:536870912];";
-    body += "node(${latLngBounds.south}, ${latLngBounds.west},${latLngBounds.north}, ${latLngBounds.east});";
+    body +=
+        "node(${latLngBounds.south}, ${latLngBounds.west},${latLngBounds.north}, ${latLngBounds.east});";
     body += "out;";
     http.Response response = await http.post(Uri.parse(overpassUrl),
         headers: {"charset": "utf-8"}, body: body);
@@ -90,9 +96,27 @@ class PoiManager {
     }
   }
 
-  showPoiDetails(PoiElement poiElement, BuildContext context) async {
-    if (poiElement.tags == null) return;
-    Map<String, dynamic> tags = poiElement.tags!;
+  Future<OverpassResponse?> getBuildingBoundariesInBounds(
+      LatLngBounds? latLngBounds, LatLng position) async {
+    if (latLngBounds == null) return null;
+    String body = "[out:json][timeout:20][maxsize:536870912];\n";
+    body +=
+        "way[\"building\"](${latLngBounds.south}, ${latLngBounds.west},${latLngBounds.north}, ${latLngBounds.east});";
+    body += "out body;\n>; \nout skel qt;";
+    print(body);
+    http.Response response = await http.post(Uri.parse(overpassUrl),
+        headers: {"charset": "utf-8"}, body: body);
+    if (response.statusCode == 200) {
+      return OverpassResponse.fromJson(
+          jsonDecode(utf8.decode(response.bodyBytes)));
+    } else {
+      return null;
+    }
+  }
+
+  showPoiDetails(Poi poi, BuildContext context) async {
+    if (poi.poiElement.tags == null) return;
+    Map<String, dynamic> tags = poi.poiElement.tags!;
     List<String> images = await getImages(tags);
     showModalBottomSheet(
       context: context,
@@ -114,7 +138,12 @@ class PoiManager {
                         delegate: SliverChildListDelegate([
                       Padding(
                         padding: EdgeInsets.all(8),
-                        child: Text(tags["name"] ?? "",
+                        child: Text(
+                            tags["name"] ??
+                                (poi.nomatimLookupElement != null
+                                    ? poi.nomatimLookupElement!
+                                        .address["amenity"]
+                                    : ""),
                             style: TextStyle(
                                 fontWeight: FontWeight.bold, fontSize: 20)),
                       ),
@@ -141,7 +170,7 @@ class PoiManager {
                       Padding(
                         padding: const EdgeInsets.all(8.0),
                         child: Text(
-                          getAdress(tags),
+                          getAdress(poi),
                           style: TextStyle(
                               fontWeight: FontWeight.bold, fontSize: 20),
                         ),
@@ -163,7 +192,8 @@ class PoiManager {
     );
   }
 
-  String getAdress(Map<String, dynamic> tags) {
+  String getAdress(Poi poi) {
+    Map<String, String> tags = poi.poiElement.tags!;
     String? street = tags["addr:street"];
     String? contactStreet = tags["contact:street"];
     String? housenumber = tags["addr:housenumber"];
@@ -173,13 +203,55 @@ class PoiManager {
     String? contactAdress = tags["contact:address"];
     String? contactAdressFull = tags["contact:address:full"];
     String? country = tags["addr:country"];
+    String? nomatimHouseNumber;
+    String? nomatimRoad;
+    String? nomatimCity;
+    String? nomatimPostcode;
+    String? nomatimCountry;
     String streetString = "";
     String postCodeString = "";
     String countryString = "";
+    if (poi.nomatimLookupElement != null) {
+      nomatimHouseNumber = poi.nomatimLookupElement!.address["house_number"];
+      nomatimRoad = poi.nomatimLookupElement!.address["road"];
+      nomatimCity = poi.nomatimLookupElement!.address["city"];
+      nomatimPostcode = poi.nomatimLookupElement!.address["postcode"];
+      nomatimCountry = poi.nomatimLookupElement!.address["country"];
+      if (nomatimRoad != null && nomatimHouseNumber != null) {
+        streetString = "$nomatimRoad $nomatimHouseNumber";
+      } else {
+        if (nomatimRoad != null) {
+          streetString = nomatimRoad;
+        }
+      }
+
+      if (nomatimPostcode != null) {
+        if (streetString.isEmpty) {
+          postCodeString += nomatimPostcode;
+        } else {
+          postCodeString += ", $nomatimPostcode";
+        }
+        if (city != null) {
+          postCodeString += ", $nomatimCity";
+        }
+      } else if (nomatimPostcode == null && nomatimCity != null) {
+        postCodeString += ", $nomatimCity";
+      }
+      if (nomatimCountry != null) {
+        countryString += ", $nomatimCountry";
+      }
+      String fullAdress = streetString + postCodeString + countryString;
+      if (fullAdress.isNotEmpty) {
+        return fullAdress;
+      }
+    }
+
     if (street != null && housenumber != null) {
       streetString = "$street $housenumber";
     } else {
-      if (contactStreet != null && contactHousenumber != null) {
+      if (street != null) {
+        streetString = street;
+      } else if (contactStreet != null && contactHousenumber != null) {
         streetString = "$contactStreet $contactHousenumber";
       }
     }
