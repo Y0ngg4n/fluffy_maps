@@ -100,6 +100,7 @@ class _MapViewState extends ConsumerState<MapView> {
   }
 
   List<FloatingMarkerTitleInfo> getTitles(List<Poi> elements) {
+    Poi? selectedPoi = ref.read(selectedPoiProvider.notifier).getState();
     List<FloatingMarkerTitleInfo> titles = [];
     for (int i = 0; i < elements.length; i++) {
       var currentElement = elements[i];
@@ -111,7 +112,10 @@ class _MapViewState extends ConsumerState<MapView> {
             latLng: LatLng(
                 currentElement.poiElement.lat!, currentElement.poiElement.lon!),
             title: currentElement.poiElement.tags!["name"]!,
-            color: Colors.black));
+            color: (selectedPoi != null &&
+                    selectedPoi.poiElement.id == currentElement.poiElement.id)
+                ? Colors.red
+                : Colors.black));
       }
     }
     return titles;
