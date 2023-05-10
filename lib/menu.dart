@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'map/map_view.dart';
+import 'map/views/map_view.dart';
 
 enum MainMenuStates { Map, Settings }
 

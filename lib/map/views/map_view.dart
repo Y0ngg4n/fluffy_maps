@@ -1,6 +1,6 @@
 import 'package:fluffy_maps/map/map_settings.dart';
-import 'package:fluffy_maps/map/poi_manager.dart';
-import 'package:fluffy_maps/map/search.dart';
+import 'package:fluffy_maps/map/api/poi_manager.dart';
+import 'package:fluffy_maps/map/views/search.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_location_marker/flutter_map_location_marker.dart';
@@ -9,8 +9,10 @@ import 'package:latlong2/latlong.dart';
 import 'package:flutter_map_floating_marker_titles/flutter_map_floating_marker_titles.dart';
 import 'package:flutter_floating_map_marker_titles_core/controller/fmto_controller.dart';
 import 'package:flutter_floating_map_marker_titles_core/model/floating_marker_title_info.dart';
-import 'location_manager.dart';
+import '../api/location_manager.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../api/overpass.dart';
 
 class MapView extends ConsumerStatefulWidget {
   MapView({Key? key}) : super(key: key);
@@ -23,21 +25,24 @@ class _MapViewState extends ConsumerState<MapView> {
   FollowOnLocationUpdate followOnLocationUpdate = FollowOnLocationUpdate.once;
   TurnOnHeadingUpdate turnOnHeadingUpdate = TurnOnHeadingUpdate.never;
   LocationManager locationManager = LocationManager();
-  PoiManager poiManager = PoiManager();
+  List<Polygon> polygons = [];
 
   @override
   void initState() {
     super.initState();
     LocationManager().determinePosition();
-    WidgetsBinding.instance.addPostFrameCallback(
-        (_) {
-          ref.read(poiProvider.notifier).getPois();
-          ref.read(buildingProvider.notifier).getBuildingBoundaries();
-        });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      MapSettings.mapController.move(MapSettings.mapController.center, 19);
+      ref.read(poiProvider.notifier).getPois();
+      ref.read(buildingProvider.notifier).getBuildingBoundaries();
+      ref.read(poiProvider.notifier).set(Overpass.mapBuildingsToPoi(
+          ref.read(buildingProvider.notifier).getState(),
+          ref.read(poiProvider.notifier).getState()));
+    });
   }
 
   List<Marker> getPoiMarker(List<Poi> elements) {
-    Poi? selectedPoi = ref.read(selectedPoiProvider.notifier).state;
+    Poi? selectedPoi = ref.read(selectedPoiProvider.notifier).getState();
     return elements
         .map((e) => Marker(
               // Experimentation
@@ -46,8 +51,11 @@ class _MapViewState extends ConsumerState<MapView> {
               width: 80,
               height: 80,
               builder: (ctx) => GestureDetector(
+                behavior: HitTestBehavior.opaque,
                 onTap: () {
-                  poiManager.showPoiDetails(e, context);
+                  ref.read(selectedPoiProvider.notifier).set(e);
+                  getPolygons();
+                  PoiManager.showPoiDetails(e, context);
                 },
                 child: Icon(
                   Icons.location_pin,
@@ -70,13 +78,25 @@ class _MapViewState extends ConsumerState<MapView> {
     return polylines;
   }
 
-  List<Polygon> getPolygons() {
-    List<Polygon> polygons = [];
-    List<Building> buildings = ref.read(buildingProvider.notifier).state;
-    for(Building building in buildings){
-      polygons.add(Polygon(points: building.boundaries));
+  getPolygons() {
+    Poi? selectedPoi = ref.read(selectedPoiProvider.notifier).getState();
+    List<Building> buildings = ref.read(buildingProvider.notifier).getState();
+    List<Polygon> polys = [];
+    for (Building building in buildings) {
+      bool isSelected = selectedPoi != null &&
+          selectedPoi.building != null &&
+          selectedPoi.building!.id == building.id;
+      polys.add(Polygon(
+          points: building.boundaries,
+          isFilled: isSelected,
+          color: Color.fromRGBO(Colors.orangeAccent.red,
+              Colors.orangeAccent.green, Colors.orangeAccent.blue, 0.25),
+          borderColor: Colors.orange,
+          borderStrokeWidth: isSelected ? 2 : 0));
     }
-    return polygons;
+    setState(() {
+      polygons = polys;
+    });
   }
 
   List<FloatingMarkerTitleInfo> getTitles(List<Poi> elements) {
@@ -113,12 +133,11 @@ class _MapViewState extends ConsumerState<MapView> {
               followOnLocationUpdate: followOnLocationUpdate,
               turnOnHeadingUpdate: turnOnHeadingUpdate,
             ),
+            PolygonLayer(
+              polygons: polygons,
+            ),
             MarkerLayer(
               markers: getPoiMarker(pois),
-            ),
-            PolygonLayer(
-              polygons: getPolygons(),
-              polygonCulling: true,
             ),
             PolylineLayer(
               polylines: getPolylines(),

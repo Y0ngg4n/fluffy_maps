@@ -1,4 +1,5 @@
-import 'package:fluffy_maps/map/poi_manager.dart';
+import 'package:fluffy_maps/map/api/metadata_manager.dart';
+import 'package:fluffy_maps/map/api/poi_manager.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -9,8 +10,9 @@ import 'package:flutter_map_floating_marker_titles/flutter_map_floating_marker_t
 import 'package:flutter_floating_map_marker_titles_core/controller/fmto_controller.dart';
 import 'package:flutter_floating_map_marker_titles_core/model/floating_marker_title_info.dart';
 
-import 'location_manager.dart';
-import 'nomatim.dart';
+import 'api/location_manager.dart';
+import 'api/nomatim.dart';
+import 'api/overpass.dart';
 
 class MapSettings {
   static FMTOMapController mapController = FMTOMapController();
@@ -32,29 +34,16 @@ class MapSettings {
       onPointerUp: (event, point) {
         ref.read(poiProvider.notifier).getPois();
         ref.read(buildingProvider.notifier).getBuildingBoundaries();
+        ref.read(poiProvider.notifier).set(Overpass.mapBuildingsToPoi(
+            ref.read(buildingProvider.notifier).getState(),
+            ref.read(poiProvider.notifier).getState()));
       },
     );
   }
 }
 
-class Poi {
-  PoiElement poiElement;
-  FloatingMarkerTitleInfo title;
-  List<String> images;
-  NomatimLookupElement? nomatimLookupElement;
-
-  Poi(this.poiElement, this.title, this.images);
-}
-
-class Building {
-  List<LatLng> boundaries;
-
-  Building(this.boundaries);
-}
-
 class PoiNotifier extends StateNotifier<List<Poi>> {
   PoiNotifier() : super([]);
-  PoiManager poiManager = PoiManager();
 
   void init() {
     state = [];
@@ -67,7 +56,7 @@ class PoiNotifier extends StateNotifier<List<Poi>> {
     }
     var position = await LocationManager().determinePosition();
     if (position == null) return;
-    OverpassResponse? overpassResponse = await poiManager.getAllPoiInBounds(
+    OverpassResponse? overpassResponse = await Overpass.getAmenityPoiInBounds(
         MapSettings.mapController.bounds,
         LatLng(position.latitude, position.longitude));
     if (overpassResponse != null) {
@@ -76,7 +65,7 @@ class PoiNotifier extends StateNotifier<List<Poi>> {
       int titleId = 0;
       for (PoiElement element in overpassResponse.elements.where((element) =>
           element.tags != null && element.tags!.containsKey("name"))) {
-        List<String> images = await poiManager.getImages(element.tags!);
+        List<String> images = await MetadataManager.getImages(element.tags!);
         pois.add(Poi(
             element,
             FloatingMarkerTitleInfo(
@@ -88,12 +77,15 @@ class PoiNotifier extends StateNotifier<List<Poi>> {
         osmIds.add(element.id);
         titleId++;
       }
-      pois =
-          mapLookupElementToPoi(await getNominatimLookupElements(osmIds), pois);
-
       state = pois;
     }
   }
+
+  void set(List<Poi> pois) {
+    state = pois;
+  }
+
+  getState() => state;
 }
 
 class BuildingNotifier extends StateNotifier<List<Building>> {
@@ -112,7 +104,7 @@ class BuildingNotifier extends StateNotifier<List<Building>> {
     var position = await LocationManager().determinePosition();
     if (position == null) return;
     OverpassResponse? overpassResponse =
-        await poiManager.getBuildingBoundariesInBounds(
+        await Overpass.getBuildingBoundariesInBounds(
             MapSettings.mapController.bounds,
             LatLng(position.latitude, position.longitude));
     if (overpassResponse != null) {
@@ -123,17 +115,18 @@ class BuildingNotifier extends StateNotifier<List<Building>> {
         if (building.nodes != null) {
           for (int node in building.nodes!) {
             bounds.addAll(overpassResponse.elements
-                .where(
-                    (element) => element.id == node)
+                .where((element) => element.id == node)
                 .map((e) => LatLng(e.lat!, e.lon!))
                 .toList());
           }
         }
-        buildings.add(Building(bounds));
+        buildings.add(Building(building.id, bounds));
       }
       state = buildings;
     }
   }
+
+  getState() => state;
 }
 
 class SelectedPoiNotifier extends StateNotifier<Poi?> {
@@ -142,6 +135,8 @@ class SelectedPoiNotifier extends StateNotifier<Poi?> {
   set(Poi? poi) {
     state = poi;
   }
+
+  getState() => state;
 }
 
 final poiProvider = StateNotifierProvider<PoiNotifier, List<Poi>>((ref) {

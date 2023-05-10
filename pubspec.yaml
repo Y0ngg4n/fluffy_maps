@@ -45,6 +45,7 @@ dependencies:
   flutter_dotenv: ^5.0.2
   flutter_riverpod: ^2.3.6
   easy_debounce: ^2.0.3
+  point_in_polygon: ^1.0.0
 
 dev_dependencies:
   flutter_test:

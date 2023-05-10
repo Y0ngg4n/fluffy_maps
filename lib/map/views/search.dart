@@ -1,79 +1,14 @@
-import 'dart:convert';
-
 import 'package:easy_debounce/easy_debounce.dart';
+import 'package:fluffy_maps/map/api/nomatim.dart';
 import 'package:fluffy_maps/map/map_settings.dart';
-import 'package:fluffy_maps/map/poi_manager.dart';
+import 'package:fluffy_maps/map/api/poi_manager.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 
-import 'location_manager.dart';
-
-class SearchElement {
-  int place_id;
-  String licence;
-  String osm_type;
-  int osm_id;
-  List<dynamic> boundingbox;
-  String lat;
-  String lon;
-  String diplay_name;
-  int place_rank;
-  String category;
-  String type;
-  double importance;
-  String? icon;
-  double? distanceInMeter;
-
-  SearchElement(
-      {required this.place_id,
-      required this.licence,
-      required this.osm_type,
-      required this.osm_id,
-      required this.boundingbox,
-      required this.lat,
-      required this.lon,
-      required this.diplay_name,
-      required this.place_rank,
-      required this.category,
-      required this.type,
-      required this.importance,
-      required this.icon});
-
-  factory SearchElement.fromJson(Map<String, dynamic> json) {
-    return SearchElement(
-      place_id: json['place_id'],
-      licence: json['licence'],
-      osm_type: json['osm_type'],
-      osm_id: json['osm_id'],
-      boundingbox: json['boundingbox'],
-      lat: json['lat'],
-      lon: json['lon'],
-      diplay_name: json['display_name'],
-      place_rank: json['place_rank'],
-      category: json['category'],
-      type: json['type'],
-      importance: json['importance'],
-      icon: json['icon'],
-    );
-  }
-}
-
-class NomatimResponse {
-  List<SearchElement> elements;
-
-  NomatimResponse({required this.elements});
-
-  factory NomatimResponse.fromJson(List<dynamic> json) {
-    return NomatimResponse(
-        elements: json
-            .map((e) => SearchElement.fromJson(e))
-            .toList()
-            .cast<SearchElement>());
-  }
-}
+import '../api/location_manager.dart';
+import '../api/overpass.dart';
 
 class SearchView extends ConsumerStatefulWidget {
   const SearchView({Key? key}) : super(key: key);
@@ -113,8 +48,9 @@ class _SearchViewState extends ConsumerState<SearchView> {
                         () async {
                           Position? position =
                               await LocationManager().determinePosition();
-                          NomatimResponse? response = await searchNomatim(
-                              position, textEditingController.text);
+                          NomatimResponse? response =
+                              await Nomatim.searchNomatim(
+                                  position, textEditingController.text);
                           setState(() {
                             nomatimSearch = response;
                           });
@@ -133,7 +69,8 @@ class _SearchViewState extends ConsumerState<SearchView> {
                         child: ListView(
                           shrinkWrap: true,
                           children: [
-                            for (SearchElement element in nomatimSearch!.elements)
+                            for (SearchElement element
+                                in nomatimSearch!.elements)
                               ListTile(
                                 leading: element.icon != null
                                     ? Image.network(element.icon!)
@@ -164,7 +101,7 @@ class _SearchViewState extends ConsumerState<SearchView> {
                                       .read(selectedPoiProvider.notifier)
                                       .set(matchedPoi);
                                   Navigator.pop(context);
-                                  PoiManager().showPoiDetails(
+                                  PoiManager.showPoiDetails(
                                       matchedPoi, context);
                                 },
                               )
@@ -175,49 +112,5 @@ class _SearchViewState extends ConsumerState<SearchView> {
         ),
       ),
     );
-  }
-
-  Future<NomatimResponse?> searchNomatim(Position? position, searchText) async {
-    print("Search");
-    http.Response response = await http.get(
-        Uri.parse(
-          "https://nominatim.openstreetmap.org/search.php?q=$searchText&format=jsonv2",
-        ),
-        headers: {"charset": "utf-8"});
-    if (response.statusCode == 200) {
-      NomatimResponse nomatimResponse =
-          NomatimResponse.fromJson(jsonDecode(utf8.decode(response.bodyBytes)));
-      if(position == null) return nomatimResponse;
-      if (nomatimResponse.elements.length > 1) {
-        nomatimResponse.elements.sort(
-          (a, b) {
-            Distance distance = Distance();
-            double ma = distance.as(
-                LengthUnit.Meter,
-                LatLng(position.latitude, position.longitude),
-                LatLng(double.parse(a.lat), double.parse(a.lon)));
-            a.distanceInMeter = ma;
-            double mb = distance.as(
-                LengthUnit.Meter,
-                LatLng(position.latitude, position.longitude),
-                LatLng(double.parse(b.lat), double.parse(b.lon)));
-            b.distanceInMeter = mb;
-            return ma.compareTo(mb);
-          },
-        );
-      } else {
-        Distance distance = Distance();
-        SearchElement searchElement = nomatimResponse.elements.first;
-        double ma = distance.as(
-            LengthUnit.Meter,
-            LatLng(position.latitude, position.longitude),
-            LatLng(double.parse(searchElement.lat),
-                double.parse(searchElement.lon)));
-        searchElement.distanceInMeter = ma;
-      }
-      return nomatimResponse;
-    } else {
-      return null;
-    }
   }
 }

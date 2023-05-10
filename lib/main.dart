@@ -1,4 +1,4 @@
-import 'package:fluffy_maps/map/map_view.dart';
+import 'package:fluffy_maps/map/views/map_view.dart';
 import 'package:fluffy_maps/menu.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
