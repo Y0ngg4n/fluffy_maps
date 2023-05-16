@@ -53,7 +53,7 @@ class _MainMenuState extends State<MainMenu> {
   _getDrawerWidget() {
     switch (selectedMenu) {
       case MainMenuStates.Map:
-        return MapView();
+        return MapView(key: mapKey);
       case MainMenuStates.Settings:
         return Container();
     }

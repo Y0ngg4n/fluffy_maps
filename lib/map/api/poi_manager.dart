@@ -1,14 +1,23 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:fluffy_maps/map/api/metadata_manager.dart';
+import 'package:fluffy_maps/map/api/osrm.dart';
 import 'package:fluffy_maps/map/api/overpass.dart';
 import 'package:fluffy_maps/map/map_settings.dart';
+import 'package:fluffy_maps/map/views/navigation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_riverpod/src/consumer.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:georouter/georouter.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:galleryimage/galleryimage.dart';
+
+import '../views/map_view.dart';
+import 'location_manager.dart';
 
 class PoiElement {
   String type;
@@ -40,11 +49,12 @@ class PoiElement {
 }
 
 class PoiManager {
-  static showPoiDetails(Poi poi, BuildContext context) async {
+  static showPoiDetails(Poi poi, BuildContext context, WidgetRef ref,
+      Stream<Position>? stream) async {
     if (poi.poiElement.tags == null) return;
     Map<String, dynamic> tags = poi.poiElement.tags!;
     List<String> images = await MetadataManager.getImages(tags);
-    showModalBottomSheet(
+    await showModalBottomSheet(
       barrierColor: Colors.black.withOpacity(0),
       context: context,
       builder: (context) {
@@ -101,6 +111,26 @@ class PoiManager {
                           style: TextStyle(
                               fontWeight: FontWeight.bold, fontSize: 20),
                         ),
+                      ),
+                      Row(
+                        children: [
+                          ElevatedButton(
+                              onPressed: () async {
+                                Position? position =
+                                    await LocationManager().determinePosition();
+                                if (position == null) return;
+                                await NavigationManager.getRoute(
+                                    ref,
+                                    LatLng(
+                                        position.latitude, position.longitude),
+                                    LatLng(poi.poiElement.lat!,
+                                        poi.poiElement.lon!));
+                                mapKey.currentState!
+                                    .setShowNavigationStart(true);
+                                Navigator.pop(context);
+                              },
+                              child: Text("Route"))
+                        ],
                       ),
                       // Text(
                       //   (tags["source"] ?? "").toString().replaceAll("_", ""),

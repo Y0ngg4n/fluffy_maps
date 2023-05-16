@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:easy_debounce/easy_debounce.dart';
 import 'package:fluffy_maps/map/api/nomatim.dart';
 import 'package:fluffy_maps/map/map_settings.dart';
@@ -11,7 +13,8 @@ import '../api/location_manager.dart';
 import '../api/overpass.dart';
 
 class SearchView extends ConsumerStatefulWidget {
-  const SearchView({Key? key}) : super(key: key);
+  Stream<Position>? stream;
+  SearchView({Key? key, required this.stream}) : super(key: key);
 
   @override
   ConsumerState<SearchView> createState() => _SearchViewState();
@@ -102,7 +105,7 @@ class _SearchViewState extends ConsumerState<SearchView> {
                                       .set(matchedPoi);
                                   Navigator.pop(context);
                                   PoiManager.showPoiDetails(
-                                      matchedPoi, context);
+                                      matchedPoi, context, ref, widget.stream);
                                 },
                               )
                           ],

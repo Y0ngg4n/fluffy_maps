@@ -1,10 +1,13 @@
 import 'package:fluffy_maps/map/api/metadata_manager.dart';
 import 'package:fluffy_maps/map/api/poi_manager.dart';
+import 'package:fluffy_maps/map/views/map_view.dart';
+import 'package:fluffy_maps/map/views/navigation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_floating_marker_titles/flutter_map_floating_marker_titles.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:georouter/georouter.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:flutter_map_floating_marker_titles/flutter_map_floating_marker_titles.dart';
 import 'package:flutter_floating_map_marker_titles_core/controller/fmto_controller.dart';
@@ -24,20 +27,6 @@ class MapSettings {
       userAgentPackageName: "pro.obco.fluffy_maps",
       urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
       subdomains: const ['a', 'b', 'c'],
-    );
-  }
-
-  static getMapOptions(WidgetRef ref) {
-    return MapOptions(
-      maxZoom: 19,
-      minZoom: 0,
-      onPointerUp: (event, point) {
-        ref.read(poiProvider.notifier).getPois();
-        ref.read(buildingProvider.notifier).getBuildingBoundaries();
-        ref.read(poiProvider.notifier).set(Overpass.mapBuildingsToPoi(
-            ref.read(buildingProvider.notifier).getState(),
-            ref.read(poiProvider.notifier).getState()));
-      },
     );
   }
 }
@@ -83,6 +72,27 @@ class PoiNotifier extends StateNotifier<List<Poi>> {
 
   void set(List<Poi> pois) {
     state = pois;
+  }
+
+  getState() => state;
+}
+
+class RouteNotifier extends StateNotifier<OSRMRoute> {
+  RouteNotifier()
+      : super(OSRMRoute(
+            route: [],
+            breadCrumbs: [],
+            navigationDistancePoints: []));
+
+  void init() {
+    state = OSRMRoute(
+        route: [],
+        breadCrumbs: [],
+        navigationDistancePoints: []);
+  }
+
+  void set(OSRMRoute osrmRoute) {
+    state = osrmRoute;
   }
 
   getState() => state;
@@ -139,8 +149,22 @@ class SelectedPoiNotifier extends StateNotifier<Poi?> {
   getState() => state;
 }
 
+class TravelModeNotifier extends StateNotifier<TravelMode> {
+  TravelModeNotifier() : super(TravelMode.walking);
+
+  set(TravelMode travelMode) {
+    state = travelMode;
+  }
+
+  getState() => state;
+}
+
 final poiProvider = StateNotifierProvider<PoiNotifier, List<Poi>>((ref) {
   return PoiNotifier();
+});
+
+final routeProvider = StateNotifierProvider<RouteNotifier, OSRMRoute>((ref) {
+  return RouteNotifier();
 });
 
 final buildingProvider =
@@ -150,3 +174,7 @@ final buildingProvider =
 
 final selectedPoiProvider = StateNotifierProvider<SelectedPoiNotifier, Poi?>(
     (ref) => SelectedPoiNotifier());
+
+final travelModeProvider =
+    StateNotifierProvider<TravelModeNotifier, TravelMode>(
+        (ref) => TravelModeNotifier());
