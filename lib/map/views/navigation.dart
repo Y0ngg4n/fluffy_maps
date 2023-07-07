@@ -8,6 +8,7 @@ import 'package:georouter/georouter.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../api/location_manager.dart';
+import '../api/openrouteservice.dart';
 import '../api/osrm.dart';
 import 'map_view.dart';
 
@@ -26,13 +27,66 @@ class OSRMRoute {
       required this.navigationDistancePoints});
 }
 
+class Step {
+  double? distance;
+  double? duration;
+  int? type;
+  String? instruction;
+  String? name;
+  List<LatLng>? waypoints;
+}
+
+class Segment {
+  double? distance;
+  double? duration;
+  List<Step>? steps;
+}
+
+class OpenRouteServiceRoute {
+  LatLng? start;
+  LatLng? end;
+  List<Segment> route;
+  List<LatLng> breadCrumbs;
+  List<LatLng> navigationDistancePoints;
+  int? transfers;
+  int? fare;
+  String? departure;
+  String? arrival;
+  double? distance;
+  double? descent;
+  double? ascent;
+  double? duration;
+
+  OpenRouteServiceRoute(
+      {this.start,
+      this.end,
+      this.departure,
+      this.arrival,
+      this.distance,
+      this.descent,
+      this.ascent,
+      this.duration,
+      this.transfers,
+      this.fare,
+      required this.route,
+      required this.breadCrumbs,
+      required this.navigationDistancePoints});
+}
+
 class NavigationManager {
   static Future<void> getRoute(WidgetRef ref, LatLng start, LatLng end) async {
-    print(ref.read(travelModeProvider.notifier).getState());
-    OSRMRoute? route = await OSRM.route(
-        ref.read(travelModeProvider.notifier).getState(), start, end);
+    // OSRMRoute? route = await OSRM.route(
+    //     ref.read(travelModeProvider.notifier).getState(), start, end);
+    RoutingProfile routingProfile =
+        ref.read(routingProfileProvider.notifier).getState();
+    List<LatLng> waypoints = [];
+    waypoints.add(start);
+    waypoints.add(end);
+    List<OpenRouteServiceRoute>? route =
+        await OpenRouteService.route(waypoints, routingProfile);
     if (route != null) {
-      ref.read(routeProvider.notifier).set(route);
+      print(route!.length);
+      ref.read(openRouteServiceRoutesRouteProvider.notifier).set(route);
       mapKey.currentState!.setState(() {});
       mapKey.currentState!.startListeningForLocationChange();
     }
@@ -53,15 +107,15 @@ class _NavigationStartState extends ConsumerState<NavigationStart> {
 
   @override
   Widget build(BuildContext context) {
-    OSRMRoute route = ref.read(routeProvider.notifier).getState();
+    OSRMRoute route = ref.read(osrmRouteProvider.notifier).getState();
 
     return StreamBuilder<Position>(
         stream: widget.positionStream,
         builder: (context, snapshot) {
-          double distance = OSRM.getDistanceOfRoute(
+          double distance = getDistanceOfRoute(
               LengthUnit.Meter, route.navigationDistancePoints);
           if (snapshot.hasData) {
-            distance = OSRM.getDistanceOfRoute(
+            distance = getDistanceOfRoute(
                 LengthUnit.Meter, route.navigationDistancePoints);
           }
           return Row(

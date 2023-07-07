@@ -11,14 +11,16 @@ import 'package:flutter_floating_map_marker_titles_core/model/floating_marker_ti
 import 'api/overpass.dart';
 import 'api/poi_manager.dart';
 import 'map_settings.dart';
-import 'package:flutter_map_directions/flutter_map_directions.dart' as directions;
-
+import 'package:flutter_map_directions/flutter_map_directions.dart'
+    as directions;
 
 class MapItems {
-  static List<Marker> getPoiMarker(BuildContext context, WidgetRef ref, Stream<Position>? stream) {
+  static List<Marker> getPoiMarker(
+      BuildContext context, WidgetRef ref, Stream<Position>? stream) {
     List<Poi> pois = ref.read(poiProvider.notifier).getState();
     Poi? selectedPoi = ref.read(selectedPoiProvider.notifier).getState();
-    OSRMRoute route = ref.read(routeProvider.notifier).getState();
+    List<OpenRouteServiceRoute> routes =
+        ref.read(openRouteServiceRoutesRouteProvider.notifier).getState();
     List<Marker> marker = pois
         .map((e) => Marker(
               // Experimentation
@@ -46,61 +48,69 @@ class MapItems {
               ),
             ))
         .toList();
-    for (int i = 0; i < route.route.length - 1; i++) {
-      LatLng current = route.route[i];
-      LatLng next = route.route[i + 1];
-      marker.add(Marker(
-        point: current,
-        builder: (context) {
-          return Transform.rotate(
-              angle: calculateAngle(current, next),
-              child: const Icon(Icons.arrow_circle_up_outlined,
-                  color: Colors.black));
-        },
-      ));
-    }
-    if (route.breadCrumbs.isNotEmpty) {
-      for (int i = 0; i < route.breadCrumbs.length - 1; i++) {
-        LatLng current = route.breadCrumbs[i];
-        LatLng next = route.breadCrumbs[i + 1];
-        if (route.route.contains(current)) continue;
+    for (OpenRouteServiceRoute route in routes) {
+      for (int i = 0; i < route.route.length - 1; i++) {
+        Segment current = route.route[i];
+        Segment next = route.route[i + 1];
         marker.add(Marker(
-          point: current,
+          point: current.steps!.first.waypoints!.first,
           builder: (context) {
             return Transform.rotate(
-                angle: calculateAngle(current, next),
-                child: const Icon(Icons.arrow_drop_up, color: Colors.blue));
+                angle: calculateAngle(current.steps!.first.waypoints!.first,
+                    current.steps!.first.waypoints![2]),
+                child: const Icon(Icons.arrow_circle_up_outlined,
+                    color: Colors.black));
           },
         ));
       }
-    }
-    if (route.route.isNotEmpty) {
-      marker.add(Marker(
-        point: route.route.last,
-        builder: (context) => const Icon(Icons.flag),
-        anchorPos: AnchorPos.exactly(Anchor(21, 5)),
-      ));
+      if (route.breadCrumbs.isNotEmpty) {
+        for (int i = 0; i < route.breadCrumbs.length - 1; i++) {
+          LatLng current = route.breadCrumbs[i];
+          LatLng next = route.breadCrumbs[i + 1];
+          if (route.route.contains(current)) continue;
+          marker.add(Marker(
+            point: current,
+            builder: (context) {
+              return Transform.rotate(
+                  angle: calculateAngle(current, next),
+                  child: const Icon(Icons.arrow_drop_up, color: Colors.blue));
+            },
+          ));
+        }
+      }
+      if (route.route.isNotEmpty) {
+        marker.add(Marker(
+          point: route.route.last.steps!.last.waypoints!.last,
+          builder: (context) => const Icon(Icons.flag),
+          anchorPos: AnchorPos.exactly(Anchor(21, 5)),
+        ));
+      }
     }
     return marker;
   }
 
   static List<Polyline> getPolylines(BuildContext context, WidgetRef ref) {
-    OSRMRoute route = ref.read(routeProvider.notifier).getState();
+    List<OpenRouteServiceRoute> routes =
+        ref.read(openRouteServiceRoutesRouteProvider.notifier).getState();
     List<Polyline> polylines = [];
-    Polyline polyline = Polyline(
-        points: route.breadCrumbs,
-        color: Color.fromRGBO(
-            Colors.blue.red, Colors.blue.green, Colors.blue.blue, 0.5),
-        strokeWidth: 10,
-        strokeJoin: StrokeJoin.bevel);
-    polylines.add(polyline);
+    for (OpenRouteServiceRoute route in routes) {
+      Polyline polyline = Polyline(
+          points: route.breadCrumbs,
+          color: Color.fromRGBO(
+              Colors.blue.red, Colors.blue.green, Colors.blue.blue, 0.5),
+          strokeWidth: 10,
+          strokeJoin: StrokeJoin.bevel);
+      polylines.add(polyline);
+    }
     return polylines;
   }
 
-  static List<directions.LatLng> getDirections(WidgetRef ref){
-    OSRMRoute route = ref.read(routeProvider.notifier).getState();
-    if(route.route.isEmpty) return [];
-    return route.route.map((e) => directions.LatLng(e.latitude, e.longitude)).toList();
+  static List<directions.LatLng> getDirections(WidgetRef ref) {
+    OSRMRoute route = ref.read(osrmRouteProvider.notifier).getState();
+    if (route.route.isEmpty) return [];
+    return route.route
+        .map((e) => directions.LatLng(e.latitude, e.longitude))
+        .toList();
   }
 
   static List<Polygon> getPolygons(BuildContext context, WidgetRef ref) {

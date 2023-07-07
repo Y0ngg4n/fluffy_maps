@@ -36,44 +36,43 @@ class OSRM {
     }
     return null;
   }
+}
 
-  static List<LatLng> increasePointDensity(
-      List<LatLng> originalPoints, double distanceInterval) {
-    List<LatLng> increasedPoints = [];
+List<LatLng> increasePointDensity(
+    List<LatLng> originalPoints, double distanceInterval) {
+  List<LatLng> increasedPoints = [];
 
-    for (var i = 0; i < originalPoints.length - 1; i++) {
-      LatLng startPoint = originalPoints[i];
-      LatLng endPoint = originalPoints[i + 1];
+  for (var i = 0; i < originalPoints.length - 1; i++) {
+    LatLng startPoint = originalPoints[i];
+    LatLng endPoint = originalPoints[i + 1];
 
-      double distance =
-          const Distance().as(LengthUnit.Meter, startPoint, endPoint);
-      int numPointsToAdd = (distance / distanceInterval).floor();
+    double distance =
+        const Distance().as(LengthUnit.Meter, startPoint, endPoint);
+    int numPointsToAdd = (distance / distanceInterval).floor();
 
-      increasedPoints.add(startPoint);
+    increasedPoints.add(startPoint);
 
-      double latStep =
-          (endPoint.latitude - startPoint.latitude) / numPointsToAdd;
-      double lonStep =
-          (endPoint.longitude - startPoint.longitude) / numPointsToAdd;
+    double latStep = (endPoint.latitude - startPoint.latitude) / numPointsToAdd;
+    double lonStep =
+        (endPoint.longitude - startPoint.longitude) / numPointsToAdd;
 
-      for (var j = 1; j <= numPointsToAdd; j++) {
-        double interpolatedLat = startPoint.latitude + (latStep * j);
-        double interpolatedLon = startPoint.longitude + (lonStep * j);
-        LatLng interpolatedPoint = LatLng(interpolatedLat, interpolatedLon);
-        increasedPoints.add(interpolatedPoint);
-      }
+    for (var j = 1; j <= numPointsToAdd; j++) {
+      double interpolatedLat = startPoint.latitude + (latStep * j);
+      double interpolatedLon = startPoint.longitude + (lonStep * j);
+      LatLng interpolatedPoint = LatLng(interpolatedLat, interpolatedLon);
+      increasedPoints.add(interpolatedPoint);
     }
-
-    increasedPoints.add(originalPoints.last);
-
-    return increasedPoints;
   }
 
-  static double getDistanceOfRoute(LengthUnit unit, List<LatLng> points) {
-    double distance = 0;
-    for (int i = 0; i < points.length - 1; i++) {
-      distance += const Distance().as(unit, points[i], points[i + 1]);
-    }
-    return distance;
+  increasedPoints.add(originalPoints.last);
+
+  return increasedPoints;
+}
+
+double getDistanceOfRoute(LengthUnit unit, List<LatLng> points) {
+  double distance = 0;
+  for (int i = 0; i < points.length - 1; i++) {
+    distance += const Distance().as(unit, points[i], points[i + 1]);
   }
+  return distance;
 }

@@ -1,4 +1,5 @@
 import 'package:fluffy_maps/map/api/metadata_manager.dart';
+import 'package:fluffy_maps/map/api/openrouteservice.dart';
 import 'package:fluffy_maps/map/api/poi_manager.dart';
 import 'package:fluffy_maps/map/views/map_view.dart';
 import 'package:fluffy_maps/map/views/navigation.dart';
@@ -77,22 +78,32 @@ class PoiNotifier extends StateNotifier<List<Poi>> {
   getState() => state;
 }
 
-class RouteNotifier extends StateNotifier<OSRMRoute> {
-  RouteNotifier()
+class OSRMRouteNotifier extends StateNotifier<OSRMRoute> {
+  OSRMRouteNotifier()
       : super(OSRMRoute(
-            route: [],
-            breadCrumbs: [],
-            navigationDistancePoints: []));
+            route: [], breadCrumbs: [], navigationDistancePoints: []));
 
   void init() {
-    state = OSRMRoute(
-        route: [],
-        breadCrumbs: [],
-        navigationDistancePoints: []);
+    state = OSRMRoute(route: [], breadCrumbs: [], navigationDistancePoints: []);
   }
 
   void set(OSRMRoute osrmRoute) {
     state = osrmRoute;
+  }
+
+  getState() => state;
+}
+
+class OpenRouteServiceRouteNotifier
+    extends StateNotifier<List<OpenRouteServiceRoute>> {
+  OpenRouteServiceRouteNotifier() : super([]);
+
+  void init() {
+    state = [];
+  }
+
+  void set(List<OpenRouteServiceRoute> openRouteServiceRoutes) {
+    state = openRouteServiceRoutes;
   }
 
   getState() => state;
@@ -159,12 +170,28 @@ class TravelModeNotifier extends StateNotifier<TravelMode> {
   getState() => state;
 }
 
+class RoutingProfileNotifier extends StateNotifier<RoutingProfile> {
+  RoutingProfileNotifier() : super(RoutingProfile.pedestrian);
+
+  set(RoutingProfile routingProfile) {
+    state = routingProfile;
+  }
+
+  getState() => state;
+}
+
 final poiProvider = StateNotifierProvider<PoiNotifier, List<Poi>>((ref) {
   return PoiNotifier();
 });
 
-final routeProvider = StateNotifierProvider<RouteNotifier, OSRMRoute>((ref) {
-  return RouteNotifier();
+final osrmRouteProvider =
+    StateNotifierProvider<OSRMRouteNotifier, OSRMRoute>((ref) {
+  return OSRMRouteNotifier();
+});
+
+final openRouteServiceRoutesRouteProvider = StateNotifierProvider<
+    OpenRouteServiceRouteNotifier, List<OpenRouteServiceRoute>>((ref) {
+  return OpenRouteServiceRouteNotifier();
 });
 
 final buildingProvider =
@@ -178,3 +205,7 @@ final selectedPoiProvider = StateNotifierProvider<SelectedPoiNotifier, Poi?>(
 final travelModeProvider =
     StateNotifierProvider<TravelModeNotifier, TravelMode>(
         (ref) => TravelModeNotifier());
+
+final routingProfileProvider =
+    StateNotifierProvider<RoutingProfileNotifier, RoutingProfile>(
+        (ref) => RoutingProfileNotifier());

@@ -16,7 +16,8 @@ import 'package:flutter_floating_map_marker_titles_core/controller/fmto_controll
 import 'package:flutter_floating_map_marker_titles_core/model/floating_marker_title_info.dart';
 import '../api/location_manager.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_map_directions/flutter_map_directions.dart' as directions;
+import 'package:flutter_map_directions/flutter_map_directions.dart'
+    as directions;
 
 import '../api/overpass.dart';
 
@@ -64,46 +65,72 @@ class MapViewState extends ConsumerState<MapView> {
         !positionStreamSubscribtion!.isPaused) return;
     setState(() {
       positionStreamSubscribtion = positionStream.listen((event) {
-        OSRMRoute route = ref.read(routeProvider.notifier).getState();
-        List<LatLng> newRoute = List.from(route.route);
-        List<LatLng> newBreadCrumbs = List.from(route.breadCrumbs);
-        List<LatLng> newNavigationDistancePoints =
-            List.from(route.navigationDistancePoints);
-        if (route.route.isNotEmpty) {
-          for (int i = 0; i < route.route.length; i++) {
-            double distance = const Distance().as(LengthUnit.Meter,
-                LatLng(event.latitude, event.longitude), route.route[i]);
-            if (distance < routePointDensity) {
-              newRoute.removeRange(0, i + 1);
+        // OSRMRoute route = ref.read(osrmRouteProvider.notifier).getState();
+        List<OpenRouteServiceRoute> routes =
+            ref.read(openRouteServiceRoutesRouteProvider.notifier).getState();
+        List<OpenRouteServiceRoute> newRoutes = [];
+        for (OpenRouteServiceRoute route in routes) {
+          List<Segment> newRoute = List.from(route.route);
+          List<LatLng> newBreadCrumbs = List.from(route.breadCrumbs);
+          List<LatLng> newNavigationDistancePoints =
+              List.from(route.navigationDistancePoints);
+          if (newRoute.isNotEmpty) {
+            for (int segmentIndex = 0;
+                segmentIndex < newRoute.length;
+                segmentIndex++) {
+              for (int stepIndex = 0;
+                  stepIndex < newRoute[segmentIndex].steps!.length;
+                  stepIndex++) {
+                for (int i = 0;
+                    i <
+                        newRoute[segmentIndex]
+                            .steps![stepIndex]
+                            .waypoints!
+                            .length;
+                    i++) {
+                  double distance = const Distance().as(
+                      LengthUnit.Meter,
+                      LatLng(event.latitude, event.longitude),
+                      newRoute[segmentIndex].steps![stepIndex].waypoints![i]);
+                  if (distance < routePointDensity) {
+                    newRoute.removeRange(0, segmentIndex);
+                    newRoute[segmentIndex]
+                        .steps![stepIndex]
+                        .waypoints!
+                        .removeRange(0, i + 1);
+                  }
+                }
+              }
             }
           }
-        }
-        if (route.breadCrumbs.isNotEmpty) {
-          for (int i = 0; i < route.breadCrumbs.length; i++) {
-            double distance = const Distance().as(LengthUnit.Meter,
-                LatLng(event.latitude, event.longitude), route.breadCrumbs[i]);
-            if (distance < routePointDensity) {
-              newBreadCrumbs.removeRange(0, i + 1);
+          if (route.breadCrumbs.isNotEmpty) {
+            for (int i = 0; i < route.breadCrumbs.length; i++) {
+              double distance = const Distance().as(
+                  LengthUnit.Meter,
+                  LatLng(event.latitude, event.longitude),
+                  route.breadCrumbs[i]);
+              if (distance < routePointDensity) {
+                newBreadCrumbs.removeRange(0, i + 1);
+              }
             }
           }
-        }
-        if (route.navigationDistancePoints.isNotEmpty) {
-          for (int i = 0; i < route.navigationDistancePoints.length; i++) {
-            double distance = const Distance().as(
-                LengthUnit.Meter,
-                LatLng(event.latitude, event.longitude),
-                route.navigationDistancePoints[i]);
-            if (distance < navigationPointDensity) {
-              newNavigationDistancePoints.removeRange(0, i + 1);
+          if (route.navigationDistancePoints.isNotEmpty) {
+            for (int i = 0; i < route.navigationDistancePoints.length; i++) {
+              double distance = const Distance().as(
+                  LengthUnit.Meter,
+                  LatLng(event.latitude, event.longitude),
+                  route.navigationDistancePoints[i]);
+              if (distance < navigationPointDensity) {
+                newNavigationDistancePoints.removeRange(0, i + 1);
+              }
             }
           }
+          newRoutes.add(route
+            ..route = newRoute
+            ..breadCrumbs = newBreadCrumbs
+            ..navigationDistancePoints = newNavigationDistancePoints);
         }
-        ref.read(routeProvider.notifier).set(OSRMRoute(
-            start: route.start,
-            end: route.end,
-            route: newRoute,
-            breadCrumbs: newBreadCrumbs,
-            navigationDistancePoints: newNavigationDistancePoints));
+        ref.read(openRouteServiceRoutesRouteProvider.notifier).set(newRoutes);
         setState(() {});
       });
     });
@@ -152,9 +179,16 @@ class MapViewState extends ConsumerState<MapView> {
                   PolylineLayer(
                     polylines: MapItems.getPolylines(context, ref),
                   ),
-                  directions.DirectionsLayer(coordinates: [directions.LatLng(0, 0), directions.LatLng(10, 10)], strokeWidth: 100, onCompleted: (isRouteAvailable) {
-                    print("Route available");
-                  },),
+                  directions.DirectionsLayer(
+                    coordinates: [
+                      directions.LatLng(0, 0),
+                      directions.LatLng(10, 10)
+                    ],
+                    strokeWidth: 100,
+                    onCompleted: (isRouteAvailable) {
+                      print("Route available");
+                    },
+                  ),
                   MarkerLayer(
                     markers:
                         MapItems.getPoiMarker(context, ref, positionStream),

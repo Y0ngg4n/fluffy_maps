@@ -41,13 +41,14 @@ dependencies:
   flutter_map_location_marker: ^6.0.0
   http: ^0.13.6
   flutter_map_floating_marker_titles: ^0.4.0
-  galleryimage: ^1.2.0
+  galleryimage: ^2.0.1
   flutter_dotenv: ^5.0.2
   flutter_riverpod: ^2.3.6
   easy_debounce: ^2.0.3
   point_in_polygon: ^1.0.0
   georouter: ^0.0.1+1
   flutter_map_directions: ^0.0.3
+  geojson_vi: ^2.2.0
 
 dev_dependencies:
   flutter_test:
