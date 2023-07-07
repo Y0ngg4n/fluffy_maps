@@ -48,26 +48,31 @@ class MapItems {
               ),
             ))
         .toList();
+    List<LatLng> edgepointMarkerLocations = [];
     for (OpenRouteServiceRoute route in routes) {
-      for (int i = 0; i < route.route.length - 1; i++) {
-        Segment current = route.route[i];
-        Segment next = route.route[i + 1];
-        marker.add(Marker(
-          point: current.steps!.first.waypoints!.first,
-          builder: (context) {
-            return Transform.rotate(
-                angle: calculateAngle(current.steps!.first.waypoints!.first,
-                    current.steps!.first.waypoints![2]),
-                child: const Icon(Icons.arrow_circle_up_outlined,
-                    color: Colors.black));
-          },
-        ));
+      for(int z = 0; z < route.route.length; z++) {
+        for (int i = 0; i < route.route[z].steps!.length - 1; i++) {
+          var current = route.route[z].steps![i];
+          var next = route.route[z].steps![i + 1];
+          edgepointMarkerLocations.add(current.waypoints!.first);
+          marker.add(Marker(
+            point: current.waypoints!.first,
+            builder: (context) {
+              return Transform.rotate(
+                  angle: calculateAngle(current.waypoints!.first,
+                      next.waypoints!.first),
+                  child: const Icon(Icons.arrow_circle_up_outlined,
+                      color: Colors.black));
+            },
+          ));
+        }
       }
       if (route.breadCrumbs.isNotEmpty) {
         for (int i = 0; i < route.breadCrumbs.length - 1; i++) {
           LatLng current = route.breadCrumbs[i];
           LatLng next = route.breadCrumbs[i + 1];
-          if (route.route.contains(current)) continue;
+          
+          if (edgepointMarkerLocations.contains(current)) continue;
           marker.add(Marker(
             point: current,
             builder: (context) {

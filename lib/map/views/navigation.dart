@@ -85,7 +85,6 @@ class NavigationManager {
     List<OpenRouteServiceRoute>? route =
         await OpenRouteService.route(waypoints, routingProfile);
     if (route != null) {
-      print(route!.length);
       ref.read(openRouteServiceRoutesRouteProvider.notifier).set(route);
       mapKey.currentState!.setState(() {});
       mapKey.currentState!.startListeningForLocationChange();
